@@ -1,0 +1,14 @@
+name='exp'
+verbose=True
+device='cpu'
+half=False
+model=''
+imgsz=640
+vid_stride=1
+source=''
+visualize=False
+save_conf=False
+save_crop=False
+show=False
+hide_labels=False
+hide_conf=False
