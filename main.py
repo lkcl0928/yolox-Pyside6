@@ -227,7 +227,7 @@ class YoloPredictor(QObject):
                     self.yolo2main_status_msg.emit('Detection completed')
                     break
         except Exception as e:
-            traceback.print_exc()
+            #traceback.print_exc()
             self.yolo2main_status_msg.emit('%s' % e)
 
     def generate(self, model):
