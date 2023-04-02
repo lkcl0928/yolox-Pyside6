@@ -181,7 +181,7 @@ class YoloPredictor(QObject):
                         start_time = time.time()
                     # preprocess
                     with self.dt[0]:
-                        im,shape,image= self.preprocess(im)
+                        im,shape,image= self.preprocess(im0s)
                         if len(im.shape) == 3:
                             im = im[None]  # expand for batch dim
                     # inference
@@ -227,7 +227,7 @@ class YoloPredictor(QObject):
                     self.yolo2main_status_msg.emit('Detection completed')
                     break
         except Exception as e:
-            #traceback.print_exc()
+            traceback.print_exc()
             self.yolo2main_status_msg.emit('%s' % e)
 
     def generate(self, model):
@@ -250,15 +250,18 @@ class YoloPredictor(QObject):
         self.vid_path, self.vid_writer = [None] * self.dataset.bs, [None] * self.dataset.bs
         return self.vid_path, self.vid_writer
 
-    def preprocess(self, img):
+    def preprocess(self,im0s):
 
         # ---------------------------------------------------------#
         #   在这里将图像转换成RGB图像，防止灰度图在预测时报错。
         #   代码仅仅支持RGB图像的预测，所有其它类型的图像都会转化成RGB
         # ---------------------------------------------------------#
-        img = img.transpose(1, 2, 0)
-        image_shape = np.array(np.shape(img)[0:2])
-        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        if self.source_type.webcam:
+            image_shape = np.array(np.shape(im0s[0])[0:2])
+            img = Image.fromarray(im0s[0])
+        else:
+            image_shape = np.array(np.shape(im0s)[0:2])
+            img = Image.fromarray(im0s)
         image=img.convert('RGB')
         # ---------------------------------------------------------#
         #   给图像增加灰条，实现不失真的resize
