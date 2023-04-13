@@ -1,6 +1,11 @@
 import colorsys
+import csv
+import shutil
 import traceback
 import logging
+import pandas as pd
+from pyecharts import Line, Bar
+# from pyecharts import options as opts
 from torch import nn
 from ultralytics.yolo.data import load_inference_source
 from ultralytics.yolo.engine.results import Results
@@ -25,6 +30,7 @@ from collections import defaultdict
 from pathlib import Path
 from util.capnums import Camera
 from util.rtsp_win import Window
+from charts import Chart_win
 import numpy as np
 import time
 import json
@@ -33,19 +39,20 @@ import sys
 import cv2
 import os
 import cfg
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
 class YoloPredictor(QObject):
-    yolo2main_pre_img = Signal(np.ndarray)   # raw image signal
-    yolo2main_res_img = Signal(np.ndarray)   # test result signal
-    yolo2main_status_msg = Signal(str)       # Detecting/pausing/stopping/testing complete/error reporting signal
-    yolo2main_fps = Signal(str)              # fps
-    yolo2main_labels = Signal(dict)          # Detected target results (number of each category)
-    yolo2main_progress = Signal(int)         # Completeness
-    yolo2main_class_num = Signal(int)        # Number of categories detected
-    yolo2main_target_num = Signal(int)       # Targets detected
+    yolo2main_pre_img = Signal(np.ndarray)  # raw image signal
+    yolo2main_res_img = Signal(np.ndarray)  # test result signal
+    yolo2main_status_msg = Signal(str)  # Detecting/pausing/stopping/testing complete/error reporting signal
+    yolo2main_fps = Signal(str)  # fps
+    yolo2main_labels = Signal(dict)  # Detected target results (number of each category)
+    yolo2main_progress = Signal(int)  # Completeness
+    yolo2main_class_num = Signal(int)  # Number of categories detected
+    yolo2main_target_num = Signal(int)  # Targets detected
     _defaults = {
         # --------------------------------------------------------------------------#
         #   使用自己训练好的模型进行预测一定要修改model_path和classes_path！
@@ -97,7 +104,7 @@ class YoloPredictor(QObject):
             setattr(self, name, value)
             self._defaults[name] = value
         show_config(**self._defaults)
-            # ---------------------------------------------------#
+        # ---------------------------------------------------#
         #   获得种类和先验框的数量
         # ---------------------------------------------------#
         self.class_names, self.num_classes = get_classes(self.classes_path)
@@ -128,7 +135,12 @@ class YoloPredictor(QObject):
         self.data_path = None
         self.source_type = None
         self.batch = None
-
+        self.carCnt = 0
+        self.motoCnt = 0
+        self.personCnt = 0
+        self.busCnt = 0
+        self.truckCnt = 0
+        self.outputDir=os.getcwd()+"/output/"
     # main for detect
     @torch.no_grad()
     def run(self):
@@ -144,7 +156,7 @@ class YoloPredictor(QObject):
                 self.used_model_name = self.new_model_name
 
             # set source
-            self.vid_path, self.vid_writer=self.setup_source(self.source if self.source is not None else cfg.source)
+            self.vid_path, self.vid_writer = self.setup_source(self.source if self.source is not None else cfg.source)
             if self.save_res or self.save_txt:
                 (self.save_dir / 'labels' if self.save_txt else self.save_dir).mkdir(parents=True, exist_ok=True)
             self.seen, self.windows, self.dt, self.batch = 0, [], (ops.Profile(), ops.Profile(), ops.Profile()), None
@@ -181,7 +193,7 @@ class YoloPredictor(QObject):
                         start_time = time.time()
                     # preprocess
                     with self.dt[0]:
-                        im,shape,image= self.preprocess(im0s)
+                        im, shape, image = self.preprocess(im0s)
                         if len(im.shape) == 3:
                             im = im[None]  # expand for batch dim
                     # inference
@@ -199,16 +211,16 @@ class YoloPredictor(QObject):
                         p, im0 = (path[i], im0s[i].copy()) if self.source_type.webcam or self.source_type.from_img \
                             else (path, im0s.copy())
                         p = Path(p)  # the source dir
-                        label_str, top_label,image = self.postprocess(preds, shape, (p, im, im0),image)
+                        label_str, top_label, image = self.postprocess(preds, shape, (p, im, im0), image)
                         target_nums += label_str
                         set1 = set(top_label)
                         class_nums += len(set1)
                         # save img or video result
                         if self.save_res:
-                            self.save_preds(vid_cap, i, str(self.save_dir / p.name),image)
+                            self.save_preds(vid_cap, i, str(self.save_dir / p.name), image)
 
                         # Send test results
-                        im0=np.asarray(image)
+                        im0 = np.asarray(image)
                         self.yolo2main_res_img.emit(im0)  # after detection
                         self.yolo2main_pre_img.emit(
                             im0s if isinstance(im0s, np.ndarray) else im0s[0])  # Before testing
@@ -227,19 +239,19 @@ class YoloPredictor(QObject):
                     self.yolo2main_status_msg.emit('Detection completed')
                     break
         except Exception as e:
-            #traceback.print_exc()
+            # traceback.print_exc()
             self.yolo2main_status_msg.emit('%s' % e)
 
     def generate(self, model):
         self.model = YoloBody(self.num_classes, self.phi)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model=model or cfg.model
+        model = model or cfg.model
         self.model.load_state_dict(torch.load(model, map_location=device))
         self.model.eval()
 
     def setup_source(self, source):
         self.imgsz = check_imgsz(cfg.imgsz, stride=32, min_dim=2)  # check image size
-        transforms=None
+        transforms = None
         self.dataset = load_inference_source(source=source,
                                              transforms=transforms,
                                              imgsz=self.imgsz,
@@ -250,7 +262,7 @@ class YoloPredictor(QObject):
         self.vid_path, self.vid_writer = [None] * self.dataset.bs, [None] * self.dataset.bs
         return self.vid_path, self.vid_writer
 
-    def preprocess(self,im0s):
+    def preprocess(self, im0s):
 
         # ---------------------------------------------------------#
         #   在这里将图像转换成RGB图像，防止灰度图在预测时报错。
@@ -262,7 +274,7 @@ class YoloPredictor(QObject):
         else:
             image_shape = np.array(np.shape(im0s)[0:2])
             img = Image.fromarray(im0s)
-        image=img.convert('RGB')
+        image = img.convert('RGB')
         # ---------------------------------------------------------#
         #   给图像增加灰条，实现不失真的resize
         #   也可以直接resize进行识别
@@ -274,9 +286,9 @@ class YoloPredictor(QObject):
         image_data = np.expand_dims(np.transpose(preprocess_input(np.array(image_data, dtype='float32')), (2, 0, 1)), 0)
         with torch.no_grad():
             images = torch.from_numpy(image_data)
-        return images,image_shape,image
+        return images, image_shape, image
 
-    def postprocess(self, preds, image_shape,batch,image):
+    def postprocess(self, preds, image_shape, batch, image):
         p, im, im0 = batch
         results = non_max_suppression(preds, self.num_classes, self.input_shape,
                                       image_shape, self.letterbox_image, conf_thres=self.conf_thres,
@@ -290,13 +302,23 @@ class YoloPredictor(QObject):
         if len(top_label) == 0:
             print('no detections')
         log_string = len(top_label)
-        colors=Colors()
+        colors = Colors()
         font = ImageFont.truetype(font='model_data/simhei.ttf',
                                   size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
         thickness = int(max((image.size[0] + image.size[1]) // np.mean(self.input_shape), 1))
         fake_result = {}
         fake_result["model_data"] = {"objects": []}
         for i, c in list(enumerate(top_label)):
+            if c == 2:
+                self.carCnt = self.carCnt + 1
+            if c == 0:
+                self.personCnt+=1
+            if c == 3:
+                self.motoCnt = self.motoCnt + 1
+            if c == 5:
+                self.busCnt=self.busCnt+1
+            if c == 7:
+                self.truckCnt = self.truckCnt + 1
             if self.save_res:
                 predicted_class = self.class_names[int(c)]
                 score = top_conf[i]
@@ -306,8 +328,8 @@ class YoloPredictor(QObject):
                 left = max(0, np.floor(left).astype('int32'))
                 bottom = min(image.size[1], np.floor(bottom).astype('int32'))
                 right = min(image.size[0], np.floor(right).astype('int32'))
-                xyxy_list=box.tolist()
-                conf_list='{:.2f}'.format(score)
+                xyxy_list = box.tolist()
+                conf_list = '{:.2f}'.format(score)
                 fake_result['model_data']['objects'].append({
                     "xmin": int(xyxy_list[0]),
                     "ymin": int(xyxy_list[1]),
@@ -326,14 +348,14 @@ class YoloPredictor(QObject):
                     text_origin = np.array([left, top + 1])
 
                 for i in range(thickness):
-                    draw.rectangle([left + i, top + i, right - i, bottom - i], outline=colors(c,True))
-                draw.rectangle([tuple(text_origin), tuple(text_origin + label_size)], fill=colors(c,True))
+                    draw.rectangle([left + i, top + i, right - i, bottom - i], outline=colors(c, True))
+                draw.rectangle([tuple(text_origin), tuple(text_origin + label_size)], fill=colors(c, True))
                 draw.text(text_origin, str(label, 'UTF-8'), fill=(0, 0, 0), font=font)
                 del draw
-        print(json.dumps(fake_result,indent=2))
-        return log_string,top_label,image
+        print(json.dumps(fake_result, indent=2))
+        return log_string, top_label, image
 
-    def save_preds(self, vid_cap, idx, save_path,image):
+    def save_preds(self, vid_cap, idx, save_path, image):
         im0 = np.asarray(image)
         if self.dataset.mode == 'image':
             cv2.imwrite(save_path, im0)
@@ -351,6 +373,35 @@ class YoloPredictor(QObject):
                 save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
                 self.vid_writer[idx] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
             self.vid_writer[idx].write(im0)
+        self.save_csv_data()
+        self.generate_chart()
+
+    def save_csv_data(self):
+        if os.path.exists(self.outputDir+"csv/"):
+            shutil.rmtree(self.outputDir+"csv/")
+        os.mkdir(self.outputDir+"csv/")
+        with open(self.outputDir+"csv/count.csv",'a',newline='') as csvfile:
+            writer=csv.writer(csvfile)
+            name=['class','count']
+            y=[]
+            z=[]
+            y.extend(['car','person','moto','bus','truck'])
+            z.extend([int(self.carCnt),int(self.personCnt),int(self.motoCnt),int(self.busCnt),int(self.truckCnt)])
+            writer.writerow(name)
+            writer.writerows(zip(y,z))
+            csvfile.close()
+
+    def generate_chart(self):
+        if os.path.exists(self.outputDir + "chart/"):
+            pass
+        else:
+            os.mkdir(self.outputDir + "chart/")
+
+        bar = Bar('检测目标数量分析图')
+        if os.path.exists(self.outputDir + "csv/count.csv"):
+            df=pd.read_csv(self.outputDir+"csv/count.csv")
+            bar.add('value',list(df['class']),list(df['count']),is_label_show=True)
+            bar.render(self.outputDir + 'chart/count.html')
 
 
 class Colors:
@@ -433,7 +484,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.src_file_button.clicked.connect(self.open_src_file)  # select local file
         self.src_cam_button.clicked.connect(self.chose_cam)  # chose_cam
         self.src_rtsp_button.clicked.connect(self.chose_rtsp)  # chose_rtsp
-
+        self.label_button.clicked.connect(self.open_tools)
+        self.chart_button.clicked.connect(self.f2)
         # start testing button
         self.run_button.clicked.connect(self.run_or_continue)  # pause/start
         self.stop_button.clicked.connect(self.stop)  # termination
@@ -616,7 +668,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             self.show_status('%s' % e)
 
+    def open_tools(self):
+        import os
+        # self.close()
+        os.system(r'python E:\labelImg-master\labelImg.py')
+
     # Save test result button--picture/video
+    def f2(self):
+        self.chart=Chart_win()
+        self.chart.show()
+
     def is_save_res(self):
         if self.save_res_button.checkState() == Qt.CheckState.Unchecked:
             self.show_status('NOTE: Run image results are not saved.')
@@ -777,10 +838,3 @@ if __name__ == "__main__":
     Home = MainWindow()
     Home.show()
     sys.exit(app.exec())
-
-
-
-
-
-
-

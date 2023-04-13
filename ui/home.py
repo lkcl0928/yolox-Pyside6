@@ -7,20 +7,22 @@
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
+import os
 import sys
 
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
-    QMetaObject, QObject, QPoint, QRect,
-    QSize, QTime, QUrl, Qt)
+                            QMetaObject, QObject, QPoint, QRect,
+                            QSize, QTime, QUrl, Qt, QFileInfo)
 from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
+from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox,
-    QFrame, QHBoxLayout, QLabel, QLayout,
-    QMainWindow, QProgressBar, QPushButton, QSizePolicy,
-    QSlider, QSpacerItem, QSpinBox, QSplitter,
-    QVBoxLayout, QWidget)
+                               QFrame, QHBoxLayout, QLabel, QLayout,
+                               QMainWindow, QProgressBar, QPushButton, QSizePolicy,
+                               QSlider, QSpacerItem, QSpinBox, QSplitter,
+                               QVBoxLayout, QWidget, QStackedWidget)
 import ui.resources_rc
 
 
@@ -246,7 +248,69 @@ class Ui_MainWindow(QWidget):
 "}")
 
         self.verticalLayout_5.addWidget(self.src_rtsp_button)
-
+        self.label_button = QPushButton(self.MenuBox)
+        self.label_button.setText('标注工具')
+        self.label_button.setObjectName(u"label_button")
+        self.label_button.setMinimumSize(QSize(0, 45))
+        self.label_button.setCursor(QCursor(Qt.PointingHandCursor))
+        self.label_button.setStyleSheet(u"QPushButton{\n"
+                                        # "background-image: url(:/all/img/set.png);\n"
+                                        "background-repeat: no-repeat;\n"
+                                        # "background-position: left center;\n"
+                                        "border: none;\n"
+                                        "border-left: 23px solid transparent;\n"
+                                        "\n"
+                                        "text-align: center;\n"
+                                        "padding-left: 0px;\n"
+                                        "color: rgba(0, 0, 0, 199);\n"
+                                        "font: 800 12pt \"Nirmala UI\";\n"
+                                        "}\n"
+                                        "\n"
+                                        "QPushButton:hover{\n"
+                                        "background-color: rgba(0, 0, 0, 59);\n"
+                                        "}")
+        self.label_button.move(-25,190)
+        #self.verticalLayout_5.addWidget(self.label_button)
+        self.chart_button = QPushButton(self.MenuBox)
+        self.chart_button.setText('数据图表')
+        self.chart_button.setObjectName(u"label_button")
+        self.chart_button.setMinimumSize(QSize(0, 45))
+        self.chart_button.setCursor(QCursor(Qt.PointingHandCursor))
+        self.chart_button.setStyleSheet(u"QPushButton{\n"
+                                        #"background-image: url(:/all/img/set.png);\n"
+                                        "background-repeat: no-repeat;\n"
+                                        #"background-position: left center;\n"
+                                        "border: none;\n"
+                                        "border-left: 23px solid transparent;\n"
+                                        "\n"
+                                        "text-align: center;\n"
+                                        "padding-left: 0px;\n"
+                                        "color: rgba(0, 0, 0, 199);\n"
+                                        "font: 800 12pt \"Nirmala UI\";\n"
+                                        "}\n"
+                                        "\n"
+                                        "QPushButton:hover{\n"
+                                        "background-color: rgba(0, 0, 0, 59);\n"
+                                        "}")
+        # self.chart_button.clicked.connect(self.f2)
+        #self.verticalLayout_5.addWidget(self.label_button)
+        self.chart_button.move(-25,260)
+        # self.stackWidget = QStackedWidget(self)
+        # self.widget2 = QWidget(self)
+        # self.vLayout2 = QVBoxLayout()
+        # self.cbx = QComboBox(self)
+        # self.cbx.addItem("检测目标数量统计")
+        # # self.cbx.addItem("出入流量统计")
+        # # self.cbx.addItem("车速区间统计")
+        # self.cbx.setMaximumWidth(30)
+        # self.cbx.setMaximumWidth(180)
+        # # # self.cbx.currentIndexChanged[int].connect(self.changeView)
+        # self.browser = QWebEngineView(self)
+        # self.browser.setStyleSheet('''QWebEngineView{background-color:rgb(104,205,210)}''')
+        # self.vLayout2.addWidget(self.cbx)
+        # self.vLayout2.addWidget(self.browser)
+        # self.widget2.setLayout(self.vLayout2)
+        #self.verticalLayout_5.addWidget(self.chart_button)
         self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
 
         self.verticalLayout_5.addItem(self.verticalSpacer)
@@ -1561,11 +1625,14 @@ class Ui_MainWindow(QWidget):
 
         QMetaObject.connectSlotsByName(MainWindow)
 
-    # setupUi
-    # def change_icon(self):
-    #     """用来修改图像的图标"""
-    #     self.setWindowIcon(self.icon)
-
+    # def changeView(self, x):
+    #     self.outputDir = os.getcwd() + "/output/"
+    #     if x == 0:
+    #         if os.path.exists(self.outputDir + 'chart/count.html'):
+    #                 self.browser.load(QUrl(QFileInfo(self.outputDir + 'chart/count.html').absoluteFilePath()))
+    # def f2(self):
+    #     self.stackWidget=QStackedWidget(self)
+    #     self.stackWidget.setCurrentIndex(1)
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"MainWindow", None))
         self.Author.setText(QCoreApplication.translate("MainWindow", u"", None))
@@ -1574,6 +1641,7 @@ class Ui_MainWindow(QWidget):
         self.src_file_button.setText(QCoreApplication.translate("MainWindow", u"Local File", None))
         self.src_cam_button.setText(QCoreApplication.translate("MainWindow", u"Camera", None))
         self.src_rtsp_button.setText(QCoreApplication.translate("MainWindow", u"Rtsp", None))
+        self.label_button.setText(QCoreApplication.translate("MainWindow", u"标注工具", None))
         self.VersionLabel.setText(QCoreApplication.translate("MainWindow", u"Version: 2.0", None))
         self.explain_title.setText(QCoreApplication.translate("MainWindow", u"YoloSide App  \u2013  A Graphical User Interface For YOLOx", None))
         self.settings_button.setText("")

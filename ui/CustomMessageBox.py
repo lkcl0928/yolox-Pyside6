@@ -9,6 +9,7 @@ class MessageBox(QMessageBox):
         super(MessageBox, self).__init__(*args, **kwargs)
         self._count = count
         self._time = time
+        self.icon=QIcon('img/gongda.jpg')
         self._auto = auto  # 是否自动关闭
         assert count > 0  # 必须大于0
         assert time >= 500  # 必须>=500毫秒
@@ -22,6 +23,7 @@ class MessageBox(QMessageBox):
                                     color:white;}''')
 
         self.setWindowTitle(title)
+        self.setWindowIcon(self.icon)
         self.setIconPixmap(QPixmap("img/face.png"))
 
         self.setStandardButtons(self.Close)  # 关闭按钮
