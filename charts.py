@@ -44,11 +44,12 @@ class Chart_win(QMainWindow):
         """用来修改图像的图标"""
         self.setWindowIcon(self.icon)
 
-# if __name__ == '__main__':
-#     app = QApplication(sys.argv)
-#     window = Chart_win()
-#     window.show()
-#     sys.exit(app.exec())
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = Chart_win()
+    window.show()
+    sys.exit(app.exec())
 
 
 
